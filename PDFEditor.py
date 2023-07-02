@@ -56,12 +56,12 @@ def multipleInput(purpose_or_item: str, unit_price: int, quantity: int, item_uni
 # test input
 eventNameInput("活動名稱一二三四五六七八九十")
 groupNameInput("活動股別一二三四五六七八九十")
-singleInput("單一項目一二三四五六七八九十")
 line_num = 0
+line_num += singleInput("單一項目一二三四五六七八九十")
 line_num += multipleInput("多個項目一二三四五六七八九十", 100, 10, '個', 1000, line_num=line_num, comma=True)
 line_num += multipleInput("abcdefgh", 100, 10, '個', 1000, line_num=line_num, comma=True)
 line_num += multipleInput("abcdefghi", 100, 10, '個', 1000, line_num=line_num, comma=True)
-line_num += multipleInput("中文en混打", 100, 10, '個', 10000, line_num=line_num, comma=True)
+line_num += multipleInput("中文英混打", 100, 10, '個', 10000, line_num=line_num, comma=True)
 
 # edit done
 can.save()
