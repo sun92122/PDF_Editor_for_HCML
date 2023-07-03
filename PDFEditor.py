@@ -8,76 +8,123 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 
-# 準備字型
-pdfmetrics.registerFont(TTFont('kai', 'font/kaiu.ttf'))
+def chineseCount(string: str):
+    count = len(string)
+    for char in string:
+        if ord(char) > 127:
+            count += 1
+    return count
 
-# 準備黏憑 PDF
-# filename = input("請輸入檔案名稱：")
-filename = 'temp'
-if os.path.isfile(f"黏貼憑證_{filename}.pdf"):
-    existing_num = 1
-    while os.path.isfile(f"黏貼憑證_{filename}_{existing_num}.pdf"):
-        existing_num += 1
-    filename = f"黏貼憑證_{filename}_{existing_num}.pdf"
-else:
-    filename = f"黏貼憑證_{filename}.pdf"
+def chineseSplit(string: str, max_len: int):
+    count = 0
+    for i in range(len(string)):
+        if ord(string[i]) > 127:
+            count += 2
+        else:
+            count += 1
+        if count > max_len:
+            return string[:i], string[i:]
+    return string, ''
 
-packet = io.BytesIO()
-can = canvas.Canvas(packet, pagesize=A4)
-# font/kaiu.ttf (kai) 12.96pt
-can.setFont('kai', 12.96)
+def fileNameCheck(filename: str):
+    if filename != '':
+        filename = f"_{filename}"
 
-def eventNameInput(eventName: str):
-    can.drawString(136.2*mm, 245.2*mm, eventName)
-
-def groupNameInput(groupName: str):
-    can.drawString(136.2*mm, 239.2*mm, groupName)
-
-def singleInput(purpose_or_item: str):
-    can.drawString(113.3*mm, 227.2*mm, purpose_or_item)
-
-def multipleInput(purpose_or_item: str, unit_price: int, quantity: int, item_unit: str, total_price: int,
-                  base_x: float = 113.3*mm, base_y: float = 221.2*mm, interval: float = 6.0*mm,
-                  line_num: float = 0, comma: bool = False):
-    if comma:
-        unit_price = f"{unit_price:,}"
-        total_price = f"{total_price:,}"
-
-    if len(purpose_or_item) > 8:
-        can.drawString(base_x, base_y-line_num*interval, purpose_or_item)
-        can.drawString(base_x+22.9*mm, base_y-(line_num+1)*interval, f"{unit_price}元 × {quantity}{item_unit} = {total_price}元")
-        return 2
+    if os.path.isfile(f"黏貼憑證{filename}.pdf"):
+        existing_num = 1
+        while os.path.isfile(f"黏貼憑證{filename}_{existing_num}.pdf"):
+            existing_num += 1
+        filename = f"黏貼憑證{filename}_{existing_num}.pdf"
     else:
-        can.drawString(base_x, base_y-line_num*interval, purpose_or_item)
-        can.drawString(base_x+22.9*mm, base_y-line_num*interval, f"{unit_price}元 × {quantity}{item_unit} = {total_price}元")
-        return 1
+        filename = f"黏貼憑證{filename}.pdf"
+
+    return filename
+
+class PDFMaker:
+    def __init__(self):
+        # 準備字型
+        pdfmetrics.registerFont(TTFont('kai', 'font/kaiu.ttf'))
+        self.filename = ''
+        self.filename = fileNameCheck(self.filename)
+        self.packet = io.BytesIO()
+        self.can = canvas.Canvas(self.packet, pagesize=A4)
+        self.can.setFont('kai', 12.96)
+        self.line_num = 0
+        self.line_height = 6.0*mm
+        self.comma = False
+        self.base_x = 113.3*mm
+        self.base_y = 227.2*mm
+
+    def eventNameInput(self, eventName: str):
+        self.can.drawString(136.2*mm, 245.2*mm, eventName)
+
+    def groupNameInput(self, groupName: str):
+        self.can.drawString(136.2*mm, 239.2*mm, groupName)
+
+    def singleInput(self, purpose_or_item: str):
+        if chineseCount(purpose_or_item) > 32:
+            purpose_or_item, purpose_or_item2 = chineseSplit(purpose_or_item, 32)
+            self.can.drawString(self.base_x, self.base_y, purpose_or_item)
+            self.can.drawString(self.base_x, self.base_y-self.line_height, purpose_or_item2)
+            self.line_num = 1
+        else:
+            self.can.drawString(self.base_x, self.base_y, purpose_or_item)
+            self.line_num = 0
+
+    def multipleInput(self, purpose_or_item: str, unit_price: int, quantity: int, item_unit: str, total_price: int):
+        swift_width = 22.9*mm
+        if self.comma:
+            unit_price = f"{unit_price:,}"
+            total_price = f"{total_price:,}"
+        
+        price_str = f"{unit_price}元 × {quantity}{item_unit} = {total_price}元"
+        price_str_len = chineseCount(price_str)
+        
+        # print purpose_or_item
+        self.can.drawString(self.base_x, self.base_y-self.line_num*self.line_height, purpose_or_item)
+
+        # print price_str
+        if chineseCount(purpose_or_item) > 10 or price_str_len > 23:
+            if price_str_len > 23:
+                self.can.drawString(self.base_x, self.base_y-(self.line_num+1)*self.line_height, price_str)
+            else:
+                self.can.drawString(self.base_x+swift_width, self.base_y-(self.line_num+1)*self.line_height, price_str)
+            self.line_num += 2
+        else:
+            self.can.drawString(self.base_x+swift_width, self.base_y-self.line_num*self.line_height, price_str)
+            self.line_num += 1
     
+    def blankLine(self, line_num: int = 1):
+        self.line_num += line_num
+    
+    def save(self):
+        self.can.save()
+        self.packet.seek(0)
+        new_pdf = PdfReader(self.packet)
+        existing_pdf = PdfReader(open("黏貼憑證用紙.pdf", "rb"))
 
-# test input
-eventNameInput("活動名稱一二三四五六七八九十")
-groupNameInput("活動股別一二三四五六七八九十")
-line_num = 0
-line_num += singleInput("單一項目一二三四五六七八九十")
-line_num += multipleInput("多個項目一二三四五六七八九十", 100, 10, '個', 1000, line_num=line_num, comma=True)
-line_num += multipleInput("abcdefgh", 100, 10, '個', 1000, line_num=line_num, comma=True)
-line_num += multipleInput("abcdefghi", 100, 10, '個', 1000, line_num=line_num, comma=True)
-line_num += multipleInput("中文英混打", 100, 10, '個', 10000, line_num=line_num, comma=True)
+        output = PdfWriter()
 
-# edit done
-can.save()
+        page = existing_pdf.pages[0]
+        page.merge_page(new_pdf.pages[0])
+        output.add_page(page)
 
-packet.seek(0)
+        # 輸出黏憑 PDF
+        outputStream = open(self.filename, "wb")
+        output.write(outputStream)
+        outputStream.close()
 
-new_pdf = PdfReader(packet)
-existing_pdf = PdfReader(open("黏貼憑證用紙.pdf", "rb"))
-
-output = PdfWriter()
-
-page = existing_pdf.pages[0]
-page.merge_page(new_pdf.pages[0])
-output.add_page(page)
-
-# 輸出黏憑 PDF
-outputStream = open(filename, "wb")
-output.write(outputStream)
-outputStream.close()
+    def updateFilename(self, filename: str):
+        self.filename = fileNameCheck(filename)
+    
+    def updateLineHeight(self, line_height: float):
+        self.line_height = line_height
+    
+    def updateComma(self, comma: bool):
+        self.comma = comma
+    
+    def reset(self):
+        self.packet = io.BytesIO()
+        self.can = canvas.Canvas(self.packet, pagesize=A4)
+        self.can.setFont('kai', 12.96)
+        self.line_num = 0
