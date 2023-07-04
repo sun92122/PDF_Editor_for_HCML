@@ -102,7 +102,11 @@ datas = {
 
 def index():
     if request.method == 'POST':
-        user['username'] = request.form['username']
-        user['age'] = request.form['age']
+        datas['eventName']['value'] = request.form['eventName']
+        datas['groupName']['value'] = request.form['groupName']
+        datas['switch']['value'] = request.form['switch']
+        datas['single']['value'] = request.form['single']
+        datas['multiple'][0]['item']['value'] = request.form['item']
+        
         # PDFMaker()
     return render_template('index.html', datas=datas)
